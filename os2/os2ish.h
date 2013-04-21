@@ -22,7 +22,19 @@
 #define HAS_KILL
 #define HAS_WAIT
 #define HAS_DLERROR
+#ifndef __KLIBC__
 #define HAS_WAITPID_RUNTIME (_emx_env & 0x200)
+#else
+#define PERL_USES_PL_PIDSTATUS
+#define HAS_WAITPID_RUNTIME 1
+#  ifndef PERL_DONT_CREATE_GVSV
+#define PERL_DONT_CREATE_GVSV 1
+#  endif
+#endif
+
+#ifdef __KLIBC__
+extern char **environ;
+#endif
 
 /* HAS_PASSWD
  *	This symbol, if defined, indicates that the getpwnam() and
@@ -213,7 +225,8 @@ int pthread_create(pthread_t *tid, const pthread_attr_t *attr,
 
 #define do_spawn(a)      os2_do_spawn(a)
 #define do_aspawn(a,b,c) os2_do_aspawn((a),(b),(c))
- 
+#endif /* USE_ITHREADS */
+
 void Perl_OS2_init(char **);
 void Perl_OS2_init3(char **envp, void **excH, int flags);
 void Perl_OS2_term(void **excH, int exitstatus, int flags);
@@ -229,25 +242,25 @@ void Perl_OS2_term(void **excH, int exitstatus, int flags);
     _response(argcp, argvp);			\
     _wildcard(argcp, argvp);			\
     Perl_OS2_init3(*envp, xreg, 0);		\
-    PERLIO_INIT
+    PERLIO_INIT }
 
-#  define PERL_SYS_INIT_BODY(argcp, argvp)  {	\
+#  define PERL_SYS_INIT_BODY(argcp, argvp)  	\
   { void *xreg[2];				\
     _response(argcp, argvp);			\
     _wildcard(argcp, argvp);			\
     Perl_OS2_init3(NULL, xreg, 0);		\
-    PERLIO_INIT
+    PERLIO_INIT }
 
 #else  /* Compiling embedded Perl or Perl extension */
 
 #  define PERL_SYS_INIT3_BODY(argcp, argvp, envp)	\
   { void *xreg[2];				\
     Perl_OS2_init3(*envp, xreg, 0);		\
-    PERLIO_INIT
-#  define PERL_SYS_INIT_BODY(argcp, argvp)	{	\
+    PERLIO_INIT }
+#  define PERL_SYS_INIT_BODY(argcp, argvp)		\
   { void *xreg[2];				\
     Perl_OS2_init3(NULL, xreg, 0);		\
-    PERLIO_INIT
+    PERLIO_INIT }
 #endif
 
 #define FORCE_EMX_DEINIT_EXIT		1
@@ -262,11 +275,18 @@ void Perl_OS2_term(void **excH, int exitstatus, int flags);
 #define PERL_SYS_TERM1(xreg)						\
      Perl_OS2_term(xreg, 0, FORCE_EMX_DEINIT_RUN_ATEXIT)
 
+#ifndef __KLIBC__
 /* This one should come in pair with PERL_SYS_INIT_BODY() and in the same block */
 #define PERL_SYS_TERM_BODY()							\
      PERL_SYS_TERM1(xreg);						\
   }
+#else
+#ifndef PERL_SYS_TERM_BODY
+#  define PERL_SYS_TERM_BODY() \
+    HINTS_REFCNT_TERM; OP_REFCNT_TERM; PERLIO_TERM; MALLOC_TERM;
 
+#endif
+#endif
 #ifndef __EMX__
 #  define PERL_CALLCONV _System
 #endif
@@ -319,7 +339,9 @@ PerlIO *my_syspopen4(pTHX_ char *cmd, char *mode, I32 cnt, SV** args);
 int my_syspclose(PerlIO *f);
 FILE *my_tmpfile (void);
 char *my_tmpnam (char *);
+#ifndef __KLIBC__
 int my_mkdir (__const__ char *, long);
+#endif
 int my_rmdir (__const__ char *);
 struct passwd *my_getpwent (void);
 void my_setpwent (void);
@@ -353,10 +375,11 @@ unsigned long DosSleep(unsigned long);
 unsigned long DosAllocThreadLocalMemory (unsigned long cb, unsigned long **p);
 #endif
 
+#ifndef __KLIBC__
 struct group *getgrent (void);
 void setgrent (void);
 void endgrent (void);
-
+#endif
 struct passwd *my_getpwuid (uid_t);
 struct passwd *my_getpwnam (__const__ char *);
 
@@ -400,7 +423,9 @@ void *emx_realloc (void *, size_t);
 /*****************************************************************************/
 
 #include <stdlib.h>	/* before the following definitions */
+#ifndef __KLIBC__
 #include <unistd.h>	/* before the following definitions */
+#endif
 #include <fcntl.h>
 #include <sys/stat.h>
 
@@ -416,7 +441,9 @@ void *emx_realloc (void *, size_t);
 	 ? (--FILE_ptr(fp), ++FILE_cnt(fp), (int)c) : ungetc(c,fp))
 #endif
 
+#ifndef __KLIBC__
 #define PERLIO_IS_BINMODE_FD(fd) _PERLIO_IS_BINMODE_FD(fd)
+#endif
 
 #ifdef __GNUG__
 # define HAS_BOOL 
@@ -427,7 +454,7 @@ void *emx_realloc (void *, size_t);
 #endif
 
 #include <emx/io.h> /* for _fd_flags() prototype */
-
+#ifndef __KLIBC__
 static inline bool
 _PERLIO_IS_BINMODE_FD(int fd)
 {
@@ -435,7 +462,7 @@ _PERLIO_IS_BINMODE_FD(int fd)
 
     return pflags && (*pflags) & O_BINARY;
 }
-
+#endif
 /* ctermid is missing from emx0.9d */
 char *ctermid(char *s);
 
@@ -541,12 +568,16 @@ void init_PMWIN_entries(void);
 
 #define OS2_XS_init() (*OS2_Perl_data.xs_init)(aTHX)
 
-#if _EMX_CRT_REV_ >= 60
+#ifndef __KLIBC__
+#if (_EMX_CRT_REV_ >= 60)
 # define os2_setsyserrno(rc)	(Perl_rc = rc, errno = errno_isOS2_set, \
 				_setsyserrno(rc))
 #else
 # define os2_setsyserrno(rc)	(Perl_rc = rc, errno = errno_isOS2)
 #endif
+#else
+# define os2_setsyserrno(rc)	(Perl_rc = rc, errno = errno_isOS2)
+#endif /* __KLIBC__ */
 
 /* The expressions below return true on error. */
 /* INCL_DOSERRORS needed. rc should be declared outside. */
@@ -786,7 +817,11 @@ char *perllib_mangle(char *, unsigned int);
 static __inline__ int
 my_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)
 {
+#ifndef __KLIBC__
   if (nfds == 0 && timeout && (_emx_env & 0x200)) {
+#else
+  if (nfds == 0 && timeout) {
+#endif
     if (async_mssleep(1000 * timeout->tv_sec + (timeout->tv_usec + 500)/1000, 500))
       return 0;
     errno = EINTR;
@@ -805,8 +840,10 @@ extern const Perl_PFN * const pExtFCN;
 char *os2error(int rc);
 int os2_stat(const char *name, struct stat *st);
 int fork_with_resources();
+#ifndef __KLIBC__
 int setpriority(int which, int pid, int val);
 int getpriority(int which /* ignored */, int pid);
+#endif
 
 void croak_with_os2error(char *s) __attribute__((noreturn));
 

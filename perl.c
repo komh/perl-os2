@@ -132,6 +132,7 @@ Perl_sys_init(int* argc, char*** argv)
     PERL_UNUSED_ARG(argc); /* may not be used depending on _BODY macro */
     PERL_UNUSED_ARG(argv);
     PERL_SYS_INIT_BODY(argc, argv);
+
 }
 
 void
@@ -413,7 +414,6 @@ Perl_nothreadhook(pTHX)
     PERL_UNUSED_CONTEXT;
     return 0;
 }
-
 #ifdef DEBUG_LEAKING_SCALARS_FORK_DUMP
 void
 Perl_dump_sv_child(pTHX_ SV *sv)
@@ -3445,7 +3445,9 @@ S_minus_v(pTHX)
 #ifdef OS2
 	PerlIO_printf(PerlIO_stdout(),
 		      "\n\nOS/2 port Copyright (c) 1990, 1991, Raymond Chen, Kai Uwe Rommel\n"
-		      "Version 5 port Copyright (c) 1994-2002, Andreas Kaiser, Ilya Zakharevich\n");
+		      "Version 5 port Copyright (c) 1994-2002, Andreas Kaiser, Ilya Zakharevich\n"
+		      "Version 5.8.8+ ports Copyright (c) 2007-2012, Paul Smedley, Knut St. Osmundsen\n");
+
 #endif
 #ifdef atarist
 	PerlIO_printf(PerlIO_stdout(),
@@ -4457,7 +4459,9 @@ S_mayberelocate(pTHX_ const char *const dir, STRLEN len, U32 flags)
 	       this way, ignoring any possible changed of length, since
 	       760ac839baf413929cd31cc32ffd6dba6b781a81 (5.003_02) so I'll leave
 	       it be.  */
-	    libdir = newSVpvn(PERLLIB_MANGLE(dir, len), len);
+/*	    libdir = newSVpvn(PERLLIB_MANGLE(dir, len), len);*/
+	const char *dir2 = PERLLIB_MANGLE(dir, len);
+	libdir = newSVpvn(dir2, strlen(dir2));
 	} else {
 	    libdir = newSVpv(PERLLIB_MANGLE(dir, 0), 0);
 	}

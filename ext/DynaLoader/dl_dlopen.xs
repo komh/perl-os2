@@ -220,7 +220,7 @@ dl_find_symbol(libhandle, symbolname)
     PREINIT:
     void *sym;
     CODE:
-#ifdef DLSYM_NEEDS_UNDERSCORE
+#if defined(DLSYM_NEEDS_UNDERSCORE)||defined(__KLIBC__)
     symbolname = Perl_form_nocontext("_%s", symbolname);
 #endif
     DLDEBUG(2, PerlIO_printf(Perl_debug_log,

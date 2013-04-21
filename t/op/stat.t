@@ -364,6 +364,7 @@ SKIP: {
 SKIP: {
     skip "No null device to test with", 1 unless -e $Null;
     skip "We know Win32 thinks '$Null' is a TTY", 1 if $Is_MSWin32;
+    skip "We know kNIX thinks '$Null' is a TTY", 1 if $Is_OS2; # FIXME
 
     open(NULL, $Null) or DIE("Can't open $Null: $!");
     ok(! -t NULL,   'null device is not a TTY');

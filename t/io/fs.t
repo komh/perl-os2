@@ -22,6 +22,7 @@ else {
 chomp($wd);
 
 my $has_link            = $Config{d_link};
+
 my $accurate_timestamps =
     !($^O eq 'MSWin32' || $^O eq 'NetWare' ||
       $^O eq 'dos'     || $^O eq 'os2'     ||
@@ -35,6 +36,9 @@ if (defined &Win32::IsWinNT && Win32::IsWinNT()) {
         $accurate_timestamps = 1;
     }
 }
+
+if ($^O eq 'os2') {
+            $has_link            = 0;}
 
 my $needs_fh_reopen =
     $^O eq 'dos'
@@ -171,6 +175,7 @@ SKIP: {
 
 SKIP: {
     skip "no fchmod", 5 unless ($Config{d_fchmod} || "") eq "define";
+    skip "doesn't work on OS/2", 5 if $^O eq 'os2';
     ok(open(my $fh, "<", "a"), "open a");
     is(chmod(0, $fh), 1, "fchmod");
     $mode = (stat "a")[2];

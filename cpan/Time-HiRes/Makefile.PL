@@ -22,7 +22,7 @@ our $self; # Used in 'sourcing' the hints.
 # TBD: Can we just use $Config(exe_ext) here instead of this complex
 #      expression?
 my $ld_exeext = ($^O eq 'cygwin' ||
-                 $^O eq 'os2' && $Config{ldflags} =~ /-Zexe\b/) ? '.exe' :
+                 $^O eq 'os2') ? '.exe' : '';
                 (($^O eq 'vos') ? $Config{exe_ext} : '');
 
 unless($ENV{PERL_CORE}) {

@@ -5,11 +5,20 @@
 #define INCL_DOSERRORS
 #define INCL_WINERRORS
 #define INCL_WINSYS
+#define INCL_EXAPIS
+#define INCL_EXAPIS_MAPPINGS
 /* These 3 are needed for compile if os2.h includes os2tk.h, not os2emx.h */
 #define INCL_DOSPROCESS
 #define SPU_DISABLESUPPRESSION          0
 #define SPU_ENABLESUPPRESSION           1
 #include <os2.h>
+#ifdef __KLIBC__
+# include <share.h>
+# include <sys/stat.h>
+# define MCW_EM                  0x003f
+extern __const__ unsigned char _osminor;
+extern __const__ unsigned char _osmajor;
+#endif
 #include "dlfcn.h"
 #include <emx/syscalls.h>
 #include <sys/emxload.h>
@@ -19,6 +28,10 @@
 /*
  * Various Unix compatibility functions for OS/2
  */
+
+#ifdef __KLIBC__
+# define INSTALL_PREFIX "/@unixroot" /* ??? */
+#endif
 
 #include <stdio.h>
 #include <errno.h>
@@ -660,7 +673,9 @@ my_type()
     TIB *tib;
     PIB *pib;
     
+#ifndef __KLIBC__
     if (!(_emx_env & 0x200)) return 1; /* not OS/2. */
+#endif
     if (CheckOSError(DosGetInfoBlocks(&tib, &pib))) 
 	return -1; 
     
@@ -674,14 +689,16 @@ my_type_set(int type)
     TIB *tib;
     PIB *pib;
     
+#ifndef __KLIBC__
     if (!(_emx_env & 0x200))
 	Perl_croak_nocontext("Can't set type on DOS"); /* not OS/2. */
+#endif
     if (CheckOSError(DosGetInfoBlocks(&tib, &pib))) 
 	croak_with_os2error("Error getting info blocks");
     pib->pib_ultype = type;
 }
 
-PFN
+Perl_PFN
 loadByOrdinal(enum entries_ordinals ord, int fail)
 {
     if (sizeof(loadOrdinals)/sizeof(loadOrdinals[0]) != ORD_NENTRIES)
@@ -832,7 +849,9 @@ setpriority(int which, int pid, int val)
 {
   ULONG rc, prio = sys_prio(pid);
 
+#ifndef __KLIBC__
   if (!(_emx_env & 0x200)) return 0; /* Nop if not OS/2. */
+#endif
   if (priors[(32 - val) >> 5] + 1 == (prio >> 8)) {
       /* Do not change class. */
       return CheckOSError(DosSetPriority((pid < 0) 
@@ -866,7 +885,9 @@ getpriority(int which /* ignored */, int pid)
 {
   ULONG ret;
 
+#ifndef __KLIBC__
   if (!(_emx_env & 0x200)) return 0; /* Nop if not OS/2. */
+#endif
   ret = sys_prio(pid);
   if (ret == PRIO_ERR) {
       return -1;
@@ -951,8 +972,10 @@ file_type(char *path)
     int rc;
     ULONG apptype;
     
+#ifndef __KLIBC__
     if (!(_emx_env & 0x200)) 
 	Perl_croak_nocontext("file_type not implemented on DOS"); /* not OS/2. */
+#endif
     if (CheckOSError(DosQueryAppType(path, &apptype))) {
 	switch (rc) {
 	case ERROR_FILE_NOT_FOUND:
@@ -972,10 +995,12 @@ file_type(char *path)
 /* Spawn/exec a program, revert to shell if needed. */
 /* global PL_Argv[] contains arguments. */
 
+#ifndef __KLIBC__
 extern ULONG _emx_exception (	EXCEPTIONREPORTRECORD *,
 				EXCEPTIONREGISTRATIONRECORD *,
                                 CONTEXTRECORD *,
                                 void *);
+#endif
 
 int
 do_spawn_ve(pTHX_ SV *really, U32 flag, U32 execf, char *inicmd, U32 addflag)
@@ -1015,7 +1040,11 @@ do_spawn_ve(pTHX_ SV *really, U32 flag, U32 execf, char *inicmd, U32 addflag)
 
       reread:
 	force_shell = 0;
+#ifndef __KLIBC__
 	if (_emx_env & 0x200) { /* OS/2. */ 
+#else
+         {
+#endif
 	    int type = file_type(real_name);
 	  type_again:
 	    if (type == -1) {		/* Not found */
@@ -1253,9 +1282,13 @@ do_spawn_ve(pTHX_ SV *really, U32 flag, U32 execf, char *inicmd, U32 addflag)
 			    /* If EXECSHELL is set, we do not set */
 			    
 			    if (!shell)
+#ifndef __KLIBC__
 				shell = ((_emx_env & 0x200)
 					 ? "c:/os2/cmd.exe"
 					 : "c:/command.com");
+#else
+                                shell = "c:/os2/cmd.exe";
+#endif
 			    nargs = shell_opt ? 2 : 1;	/* shell file args */
 			    exec_args[0] = shell;
 			    exec_args[1] = shell_opt;
@@ -1859,8 +1892,98 @@ XS(XS_File__Copy_syscopy)
 	else {
 	    flag = (unsigned long)SvIV(ST(2));
 	}
+#ifdef __KLIBC__x
+    {
+        /* open the input file and verify that it is a file. */
+        int err = 0;
+        int fdSrc = sopen(src, O_RDONLY | O_BINARY | O_NOINHERIT, SH_DENYRW);
+        if (fdSrc < 0)
+            fdSrc = sopen(src, O_RDONLY | O_BINARY | O_NOINHERIT, SH_DENYNO);
+        if (fdSrc)
+        {
+            struct stat stSrc;
+            if (!fstat(fdSrc, &stSrc))
+            {
+                if (S_ISREG(stSrc.st_mode))
+                {
+                    /* open the output file. */
+                    unsigned dstFlags = O_WRONLY | O_BINARY | O_CREAT;
+                    if (flag & DCPY_EXISTING)
+                        dstFlags |= O_TRUNC;
+                    else
+                        dstFlags |= O_EXCL;
+                    if (flag & DCPY_APPEND)
+                        dstFlags |= O_APPEND;
+                    int fdDst = sopen(dst, dstFlags | O_SIZE, SH_DENYRW, 0777, stSrc.st_size);
+                    if (fdDst < 0)
+                        fdDst = sopen(dst, dstFlags | O_SIZE, SH_DENYNO, 0777, stSrc.st_size);
+                    if (fdDst < 0)
+                        fdDst = sopen(dst, dstFlags, SH_DENYNO, 0777, 0);
+                    if (fdDst >= 0)
+                    {
+                        /* allocate buffer */
+                        void *pvBuf, *pvFree;
+                        size_t cbBuf = 0xf000;
+                        pvFree = pvBuf = _tmalloc(cbBuf);
+                        if (!pvBuf)
+                            pvBuf = alloca(cbBuf = 0x8000);
 
+                        /* copy loop. */
+                        while (!err)
+                        {
+                            ssize_t cbSrc, cbDst;
+
+                            cbSrc = read(fdSrc, pvBuf, cbBuf);
+                            if (cbSrc == 0)
+                                break; /* eof */
+                            if (cbSrc < 0)
+                                err = errno;
+                            else
+                            {
+                                cbDst = write(fdDst, pvBuf, cbSrc);
+                                if (cbDst <= 0)
+                                    err = errno;
+                                else if (cbDst < cbSrc)
+                                {
+                                    ssize_t cb;
+                                    do
+                                    {
+                                        cb = write(fdDst, (const char *)pvBuf + cbDst, cbSrc - cbDst);
+                                        if (cb >= 0)
+                                            cbDst += cb;
+                                        else
+                                            err = errno;
+                                    }
+                                    while (cbDst < cbSrc && !err);
+                                }
+                            }
+                        } /* the copy loop  */
+
+                        /* TODO/FIXME: EAs! */
+
+                        /* cleanup */
+                        free(pvFree);
+                        close(fdDst);
+                    }
+                    else
+                        err = errno;
+                }
+                else
+                    err = ENOTSUP;
+            }
+            else
+                err = errno;
+            close(fdSrc);
+         }
+        else
+            err = errno;
+        errno = err;
+	RETVAL = !err;
+    }
+#else
 	RETVAL = !CheckOSError(DosCopy(src, dst, flag));
+#endif
+/* FIXME: this copies EAs as well, including the unix EAs. great. */
 	XSprePUSH; PUSHi((IV)RETVAL);
     }
     XSRETURN(1);
@@ -2074,7 +2197,9 @@ os2error(int rc)
 	char *s;
 	int number = SvTRUE(get_sv("OS2::nsyserror", GV_ADD));
 
+#ifndef __KLIBC__
         if (!(_emx_env & 0x200)) return ""; /* Nop if not OS/2. */
+#endif
 	if (rc == 0)
 		return "";
 	if (number) {
@@ -2143,13 +2268,18 @@ os2error(int rc)
 void
 ResetWinError(void)
 {
-  WinError_2_Perl_rc;
+#if 0 /* fix me later */
+  init_PMWIN_entries();
+  OS2_Perl_data.rc=(*PMWIN_entries.GetLastError)(perl_hab_GET());
+#endif
 }
 
 void
 CroakWinError(int die, char *name)
 {
+#if 0 /* fix me later */
   FillWinError;
+#endif
   if (die && Perl_rc)
     croak_with_os2error(name ? name : "Win* API call");
 }
@@ -2295,6 +2425,7 @@ dir_subst(char *s, unsigned int l, char *b, unsigned int bl, enum dir_subst_e fl
 
 		    to = dllname2buffer(aTHX_ b, bl);
 		} else {				/* No Perl present yet */
+
 		    HMODULE self = find_myself();
 		    APIRET rc = DosQueryModuleName(self, bl, b);
 
@@ -2305,6 +2436,7 @@ dir_subst(char *s, unsigned int l, char *b, unsigned int bl, enum dir_subst_e fl
 			if (*to == '\\')
 			    *to = '/';
 		    to = b;
+
 		}
 		break;
 	      case 'e': case 'E':
@@ -2651,9 +2783,10 @@ async_mssleep(ULONG ms, int switch_priority) {
   char *e = NULL;
   APIRET badrc;
 
+#ifndef __KLIBC__
   if (!(_emx_env & 0x200))	/* DOS */
     return !_sleep2(ms);
-
+#endif
   os2cp_croak(DosCreateEventSem(NULL,	     /* Unnamed */
 				&hevEvent1,  /* Handle of semaphore returned */
 				DC_SEM_SHARED, /* Shared needed for DosAsyncTimer */
@@ -3407,6 +3540,7 @@ XS(XS_Cwd_sys_is_absolute)
 	char *	path = (char *)SvPV(ST(0),n_a);
 	bool	RETVAL;
 
+fprintf(stderr,"sys_is_absolute1 = %s\n",path);
 	RETVAL = sys_is_absolute(path);
 	ST(0) = boolSV(RETVAL);
 	if (SvREFCNT(ST(0))) sv_2mortal(ST(0));
@@ -3424,6 +3558,7 @@ XS(XS_Cwd_sys_is_rooted)
 	char *	path = (char *)SvPV(ST(0),n_a);
 	bool	RETVAL;
 
+fprintf(stderr,"sys_is_rooted1 = %s\n",path);
 	RETVAL = sys_is_rooted(path);
 	ST(0) = boolSV(RETVAL);
 	if (SvREFCNT(ST(0))) sv_2mortal(ST(0));
@@ -3441,6 +3576,7 @@ XS(XS_Cwd_sys_is_relative)
 	char *	path = (char *)SvPV(ST(0),n_a);
 	bool	RETVAL;
 
+fprintf(stderr,"sys_is_relative1 = %s\n",path);
 	RETVAL = sys_is_relative(path);
 	ST(0) = boolSV(RETVAL);
 	if (SvREFCNT(ST(0))) sv_2mortal(ST(0));
@@ -3491,6 +3627,12 @@ XS(XS_Cwd_sys_abspath)
 	    path += 2;
 	}
 	if (dir == NULL) {
+#ifdef __KLIBC__
+        assert(MAXPATHLEN >= PATH_MAX);
+	    if (realpath(path, p) != 0) {
+            RETVAL = p;
+        } else
+#endif
 	    if (_abspath(p, path, MAXPATHLEN) == 0) {
 		RETVAL = p;
 	    } else {
@@ -3498,6 +3640,7 @@ XS(XS_Cwd_sys_abspath)
 	    }
 	} else {
 	    /* Absolute with drive: */
+fprintf(stderr,"sys_is_absolute2 = %s\n",path);
 	    if ( sys_is_absolute(path) ) {
 		if (_abspath(p, path, MAXPATHLEN) == 0) {
 		    RETVAL = p;
@@ -3532,7 +3675,9 @@ XS(XS_Cwd_sys_abspath)
 		   c)	path is on current drive, and dir is rooted
 		   In all the cases it is safe to drop the drive part
 		   of the path. */
+fprintf(stderr,"sys_is_relative2 = %s\n",path);
 		if ( !sys_is_relative(path) ) {
+fprintf(stderr,"sys_is_absolute3 = %s\n",dir);
 		    if ( ( ( sys_is_absolute(dir)
 			     || (isALPHA(dir[0]) && dir[1] == ':' 
 				 && strnicmp(dir, path,1) == 0)) 
@@ -3575,7 +3720,7 @@ XS(XS_Cwd_sys_abspath)
 	/* Backslashes are already converted to slashes. */
 	/* Remove trailing slashes */
 	l = strlen(RETVAL);
-	while (l > 0 && RETVAL[l-1] == '/')
+	while (l > 0 && RETVAL[l-1] == '/' && (l > 3 || RETVAL[1] != ':'))
 	    l--;
 	ST(0) = sv_newmortal();
 	sv_setpvn( sv = (SV*)ST(0), RETVAL, l);
@@ -4145,7 +4290,7 @@ XS(XS_OS2_pipe)
 	    }
 	    if (items >= 5) {
 		STRLEN lll = SvUV(ST(4));
-		SV *sv = NEWSV(914, lll);
+		SV *sv = newSV(lll);
 
 		sv_2mortal(sv);
 		ll = lll;
@@ -4400,7 +4545,7 @@ XS(XS_OS2_pipeCntl)
 	    } else if (BytesAvail.cbpipe == 0) {
 		XSRETURN_NO;
 	    } else {
-		SV *tmp = NEWSV(914, BytesAvail.cbpipe);
+		SV *tmp = newSV( BytesAvail.cbpipe);
 		char *s = SvPVX(tmp);
 
 		sv_2mortal(tmp);
@@ -4502,7 +4647,11 @@ Xs_OS2_init(pTHX)
     {
 	GV *gv;
 
+#ifndef __KLIBC__
 	if (_emx_env & 0x200) {	/* OS/2 */
+#else
+            {
+#endif
             newXS("File::Copy::syscopy", XS_File__Copy_syscopy, file);
             newXS("Cwd::extLibpath", XS_Cwd_extLibpath, file);
             newXS("Cwd::extLibpath_set", XS_Cwd_extLibpath_set, file);
@@ -4562,16 +4711,25 @@ Xs_OS2_init(pTHX)
 	gv = gv_fetchpv("OS2::can_fork", TRUE, SVt_PV);
 	GvMULTI_on(gv);
 	sv_setiv(GvSV(gv), exe_is_aout());
+#ifndef __KLIBC__
 	gv = gv_fetchpv("OS2::emx_rev", TRUE, SVt_PV);
+#endif
 	GvMULTI_on(gv);
+#ifndef __KLIBC__
 	sv_setiv(GvSV(gv), _emx_rev);
 	sv_setpv(GvSV(gv), _emx_vprt);
+#endif
 	SvIOK_on(GvSV(gv));
+#ifndef __KLIBC__
 	gv = gv_fetchpv("OS2::emx_env", TRUE, SVt_PV);
+#endif
 	GvMULTI_on(gv);
+#ifndef __KLIBC__
 	sv_setiv(GvSV(gv), _emx_env);
+#endif
 	gv = gv_fetchpv("OS2::os_ver", TRUE, SVt_PV);
 	GvMULTI_on(gv);
+
 	sv_setnv(GvSV(gv), _osmajor + 0.001 * _osminor);
 	gv = gv_fetchpv("OS2::nsyserror", TRUE, SVt_PV);
 	GvMULTI_on(gv);
@@ -4580,13 +4738,16 @@ Xs_OS2_init(pTHX)
     return 0;
 }
 
+#ifndef __KLIBC__
 extern void _emx_init(void*);
+#endif
 
 static void jmp_out_of_atexit(void);
 
 #define FORCE_EMX_INIT_CONTRACT_ARGV	1
 #define FORCE_EMX_INIT_INSTALL_ATEXIT	2
 
+#ifndef __KLIBC__
 static void
 my_emx_init(void *layout) {
     static volatile void *old_esp = 0;	/* Cannot be on stack! */
@@ -4602,7 +4763,7 @@ my_emx_init(void *layout) {
 		"popa\n"
 		"popf\n" : : "r" (layout), "m" (old_esp)	);
 }
-
+#endif
 struct layout_table_t {
     ULONG text_base;
     ULONG text_end;
@@ -4622,6 +4783,7 @@ struct layout_table_t {
     char options[64];
 };
 
+#ifndef __KLIBC__
 static ULONG
 my_os_version() {
     static ULONG osv_res;		/* Cannot be on stack! */
@@ -4637,7 +4799,9 @@ my_os_version() {
 
     return osv_res;
 }
+#endif
 
+#ifndef __KLIBC__
 static void
 force_init_emx_runtime(EXCEPTIONREGISTRATIONRECORD *preg, ULONG flags)
 {
@@ -4742,7 +4906,7 @@ force_init_emx_runtime(EXCEPTIONREGISTRATIONRECORD *preg, ULONG flags)
     if (error)
 	exit(56);
 }
-
+#endif
 static void
 jmp_out_of_atexit(void)
 {
@@ -4789,8 +4953,11 @@ Perl_OS2_term(void **p, int exitstatus, int flags)
 
 #include <emx/startup.h>
 
+#ifndef __KLIBC__
 extern ULONG __os_version();		/* See system.doc */
+#endif
 
+#ifndef __KLIBC__
 void
 check_emx_runtime(char **env, EXCEPTIONREGISTRATIONRECORD *preg)
 {
@@ -4846,6 +5013,7 @@ check_emx_runtime(char **env, EXCEPTIONREGISTRATIONRECORD *preg)
     /*  If the executable does not use EMX.DLL, EMX.DLL is not completely
 	initialized either.  Uninitialized EMX.DLL returns 0 in the low
 	nibble of __os_version().  */
+
     v_emx = my_os_version();
 
     /*	_osmajor and _osminor are normally set in _DLL_InitTerm of CRT DLL
@@ -4857,10 +5025,12 @@ check_emx_runtime(char **env, EXCEPTIONREGISTRATIONRECORD *preg)
 	__os_version().  */
     v_crt = (_osmajor | _osminor);
 
+#ifndef __KLIBC__
     if ((_emx_env & 0x200) && !(v_emx & 0xFFFF)) {	/* OS/2, EMX uninit. */ 
 	force_init_emx_runtime( preg,
 				FORCE_EMX_INIT_CONTRACT_ARGV 
 				| FORCE_EMX_INIT_INSTALL_ATEXIT );
+#endif
 	emx_wasnt_initialized = 1;
 	/* Update CRTL data basing on now-valid EMX runtime data */
 	if (!v_crt) {		/* The only wrong data are the versions. */
@@ -4899,7 +5069,7 @@ check_emx_runtime(char **env, EXCEPTIONREGISTRATIONRECORD *preg)
     if (hmtx_emx_init)
 	DosReleaseMutexSem(hmtx_emx_init);
 }
-
+#endif
 #define ENTRY_POINT 0x10000
 
 static int
@@ -4937,8 +5107,9 @@ Perl_OS2_init3(char **env, void **preg, int flags)
     _uflags (_UF_SBRK_MODEL, _UF_SBRK_ARBITRARY);
     MALLOC_INIT;
 
+#ifndef __KLIBC__
     check_emx_runtime(env, (EXCEPTIONREGISTRATIONRECORD *)preg);
-
+#endif
     settmppath();
     OS2_Perl_data.xs_init = &Xs_OS2_init;
     if (perl_sh_installed) {
@@ -4949,7 +5120,9 @@ Perl_OS2_init3(char **env, void **preg, int flags)
     } else if ( (shell = getenv("PERL_SH_DRIVE")) ) {
 	Newx(PL_sh_path, strlen(SH_PATH) + 1, char);
 	strcpy(PL_sh_path, SH_PATH);
+#ifndef __KLIBC__
 	PL_sh_path[0] = shell[0];
+#endif
     } else if ( (shell = getenv("PERL_SH_DIR")) ) {
 	int l = strlen(shell), i;
 
@@ -4958,9 +5131,11 @@ Perl_OS2_init3(char **env, void **preg, int flags)
 	Newx(PL_sh_path, l + 8, char);
 	strncpy(PL_sh_path, shell, l);
 	strcpy(PL_sh_path + l, "/sh.exe");
+#ifndef __KLIBC__
 	for (i = 0; i < l; i++) {
 	    if (PL_sh_path[i] == '\\') PL_sh_path[i] = '/';
 	}
+#endif
     }
 #if defined(USE_5005THREADS) || defined(USE_ITHREADS)
     MUTEX_INIT(&start_thread_mutex);
@@ -4996,6 +5171,7 @@ Perl_OS2_init3(char **env, void **preg, int flags)
     _control87(MCW_EM, MCW_EM);
 }
 
+#ifndef __KLIBC__ /* libc already checks this. */
 int
 fd_ok(int fd)
 {
@@ -5029,6 +5205,7 @@ dup(int from)
     errno = EBADF;
     return -1;
 }
+#endif /* !__KLIBC__ */
 
 #undef tmpnam
 #undef tmpfile
@@ -5136,8 +5313,10 @@ my_flock(int handle, int o)
    }
    MUTEX_UNLOCK(&perlos2_state_mutex);
   }
+#ifndef __KLIBC__
   if (!(_emx_env & 0x200) || !use_my_flock) 
     return flock(handle, o);	/* Delegate to EMX. */
+#endif
   
                                         /* is this a file? */
   if ((DosQueryHType(handle, &handle_type, &flag_word) != 0) ||
@@ -5276,6 +5455,7 @@ my_getpwent (void)
   return getpwuid(0);
 }
 
+#ifndef __KLIBC__
 void
 setgrent(void)
 {
@@ -5294,7 +5474,7 @@ getgrent (void)
     return 0;				/* Return one entry only */
   return getgrgid(0);
 }
-
+#endif
 #undef getpwuid
 #undef getpwnam
 

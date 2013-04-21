@@ -447,7 +447,7 @@ PPCODE:
 #endif
 }
 
-#if defined(WIN32) && !defined(UNDER_CE)
+#if (defined(WIN32) && !defined(UNDER_CE)) || defined(__OS2__)
 
 void
 getdcwd(...)

@@ -69,8 +69,9 @@ extern "C" {
 /* Though the cpp define ITIMER_VIRTUAL is available the functionality
  * is not supported in Cygwin as of August 2004, ditto for Win32.
  * Neither are ITIMER_PROF or ITIMER_REALPROF implemented.  --jhi
+ * Ditto for kLIBC. --bird
  */
-#if defined(__CYGWIN__) || defined(WIN32)
+#if defined(__CYGWIN__) || defined(WIN32) || defined(__KLIBC__)
 #   undef ITIMER_VIRTUAL
 #   undef ITIMER_PROF
 #   undef ITIMER_REALPROF

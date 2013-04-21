@@ -50,7 +50,8 @@ if ($opt{clean}) {
 }
 
 # Determine full perl location
-my $perl = which_perl();
+#my $perl = which_perl();
+my $perl = "u:/dev/perl-5.16.0/miniperl.exe";
 
 # We're now changing the directory, which confuses the deferred
 # loading in Config.pm, so we better use an absolute @INC path

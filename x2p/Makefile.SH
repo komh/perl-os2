@@ -112,7 +112,7 @@ all: $(public) $(private) $(util)
 	@echo " "
 
 a2p$(EXE_EXT): $(obj) a2p$(OBJ_EXT)
-	$(CC) -o a2p $(LDFLAGS) $(obj) a2p$(OBJ_EXT) $(libs)
+	$(CC) -o a2p$(EXE_EXT) $(LDFLAGS) $(obj) a2p$(OBJ_EXT) $(libs)
 
 # I now supply a2p.c with the kits, so the following section is
 # used only if you force byacc to run by saying

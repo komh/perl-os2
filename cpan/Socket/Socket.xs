@@ -878,7 +878,7 @@ inet_ntop(af, ip_address_sv)
 	CODE:
 #ifdef HAS_INETNTOP
 	STRLEN addrlen, struct_size;
-#ifdef AF_INET6
+#if defined(AF_INET6) && !defined(__KLIBC__) /* klibc defines AF_INET6 but does not support all functions */
 	struct in6_addr addr;
 	char str[INET6_ADDRSTRLEN];
 #else
@@ -895,12 +895,12 @@ inet_ntop(af, ip_address_sv)
 	struct_size = sizeof(addr);
 
 	if (af != AF_INET
-#ifdef AF_INET6
+#if defined(AF_INET6) && !defined(__KLIBC__) /* klibc defines AF_INET6 but does not support all functions */
 	    && af != AF_INET6
 #endif
 	   ) {
 		croak("Bad address family for %s, got %d, should be"
-#ifdef AF_INET6
+#if defined(AF_INET6) && !defined(__KLIBC__) /* klibc defines AF_INET6 but does not support all functions */
 		      " either AF_INET or AF_INET6",
 #else
 		      " AF_INET",
@@ -924,7 +924,7 @@ inet_pton(af, host)
 #ifdef HAS_INETPTON
 	int ok;
 	int addrlen = 0;
-#ifdef AF_INET6
+#if defined(AF_INET6) && !defined(__KLIBC__) /* klibc defines AF_INET6 but does not support all functions */
 	struct in6_addr ip_address;
 #else
 	struct in_addr ip_address;
@@ -934,14 +934,14 @@ inet_pton(af, host)
 	  case AF_INET:
 	    addrlen = 4;
 	    break;
-#ifdef AF_INET6
+#if defined(AF_INET6) && !defined(__KLIBC__) /* klibc defines AF_INET6 but does not support all functions */
 	  case AF_INET6:
 	    addrlen = 16;
 	    break;
 #endif
 	  default:
 		croak("Bad address family for %s, got %d, should be"
-#ifdef AF_INET6
+#if defined(AF_INET6) && !defined(__KLIBC__) /* klibc defines AF_INET6 but does not support all functions */
 		      " either AF_INET or AF_INET6",
 #else
 		      " AF_INET",
