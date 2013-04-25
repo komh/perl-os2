@@ -281,6 +281,10 @@ void Perl_OS2_term(void **excH, int exitstatus, int flags);
      PERL_SYS_TERM1(xreg);						\
   }
 #else
+#define PERL_SYS_TERM_BODY()						\
+    PERL_SYS_TERM1(0);							\
+    HINTS_REFCNT_TERM; OP_REFCNT_TERM; PERLIO_TERM; MALLOC_TERM;
+
 #ifndef PERL_SYS_TERM_BODY
 #  define PERL_SYS_TERM_BODY() \
     HINTS_REFCNT_TERM; OP_REFCNT_TERM; PERLIO_TERM; MALLOC_TERM;

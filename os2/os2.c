@@ -900,6 +900,182 @@ getpriority(int which /* ignored */, int pid)
 
 
 
+/* OS/2 can process a command line up to 32K */
+#define MAX_CMD_LINE_LEN 32768
+
+struct rsp_temp {
+    int    pid;
+    char  *name;
+    struct rsp_temp *next;
+};
+
+static struct rsp_temp *rsp_temp_start = NULL;
+
+static void
+remove_rsp_temp(int pid)
+{
+    struct rsp_temp *rsp_temp;
+    struct rsp_temp *rsp_temp_prev = NULL;
+    struct rsp_temp *rsp_temp_next = NULL;
+
+    for (rsp_temp = rsp_temp_start; rsp_temp; rsp_temp = rsp_temp_next) {
+        rsp_temp_next = rsp_temp->next;
+
+        if (pid == -1 || rsp_temp->pid == pid) {
+            if (rsp_temp_start == rsp_temp)
+                rsp_temp_start = rsp_temp_next;
+            else    /* rsp_temp_prev must not be NULL */
+              rsp_temp_prev->next = rsp_temp_next;
+
+            remove (rsp_temp->name);
+            free (rsp_temp->name);
+            free (rsp_temp);
+
+            if (pid != -1)
+                break;
+        }
+
+        rsp_temp_prev = rsp_temp;
+    }
+}
+
+enum rsp_spawn_t {
+  RSP_SPAWN,
+  RSP_SPAWNP,
+  RSP_EXEC,
+  RSP_EXECP
+};
+
+static int
+rsp_spawnv(U32 rsp_spawnf, int mode, const char *name, char * const argv[])
+{
+    int   rc;
+    char *rsp_argv[3];
+    char  rsp_name_arg[] = "@perl-rsp-XXXXXX";
+    char *rsp_name = &rsp_name_arg[1];
+    int   arg_len = 0;
+    int   i;
+
+    for (i = 0; argv[i]; i++)
+        arg_len += strlen(argv[i]) + 1;
+
+    /* if a length of command line is longer than MAX_CMD_LINE_LEN, then use
+     * a response file. OS/2 cannot process a command line longer than 32K.
+     * Of course, a response file cannot be recognized by a normal OS/2
+     * program, that is, neither non-EMX or non-kLIBC. But it cannot accept
+     * a command line longer than 32K in itself. So using a response file
+     * in this case, is an acceptable solution */
+    if (arg_len > MAX_CMD_LINE_LEN) {
+        int    fd;
+        struct temp *t;
+
+        if ((fd = mkstemp(rsp_name)) == -1)
+            return -1;
+
+        /* write all the arguments except a 0th program name */
+        for (i = 1; argv[i]; i++) {
+            char *p = strdup(argv[i]);
+            char *p1 = p;
+            /* replace a new line with a space.
+             * a line in a rsp file means one argument, so a new line in an
+             * argument splits it into two argument. this is not expected.
+             * consequently, a new line character cannot be passed. pray a
+             * new line character should not be used as a normal character.
+             * ^^
+             */
+            while ((p1 = strchr(p1, '\n')) != NULL)
+                *p1++ = ' ';
+            write(fd, p, strlen(p));
+            write(fd, "\n", 1);
+            free(p);
+        }
+
+        close (fd);
+
+        rsp_argv[0] = argv[0];
+        rsp_argv[1] = rsp_name_arg;
+        rsp_argv[2] = NULL;
+
+        argv = rsp_argv;
+    }
+
+    switch (rsp_spawnf) {
+    case RSP_SPAWNP :
+        rc = spawnvp(mode, name, argv);
+        break;
+
+    case RSP_EXEC :
+        rc = execv(name, argv);
+        break;
+
+    case RSP_EXECP :
+        rc = execvp(name, argv);
+
+    default :
+        rc = spawnv(mode, name, argv);
+    }
+
+    /* a response file was generated ? */
+    if (argv == rsp_argv) {
+        /* make a response file list to clean up later if spawned a child
+         * successfully except P_WAIT */
+        if (rc >= 0 && ( mode & 0xFF ) != P_WAIT) {
+            struct rsp_temp *rsp_temp_new;
+
+            rsp_temp_new       = malloc(sizeof(*rsp_temp_new));
+            rsp_temp_new->pid  = rc;
+            rsp_temp_new->name = strdup(rsp_name);
+            rsp_temp_new->next = rsp_temp_start;
+            rsp_temp_start = rsp_temp_new;
+        }
+        else                    /* failed or P_WAIT ? */
+            remove(rsp_name);   /* remove immediately */
+    }
+
+    return rc;
+}
+
+static int
+rsp_spawnl(U32 rsp_spawnf, int mode, const char *name, const char *arg0, ...)
+{
+    int          rc;
+    int          argc, i;
+    const char **argv;
+    va_list      arg_ptr;
+    const char  *arg;
+
+    va_start(arg_ptr, arg0);
+    for(i = 0, arg = arg0; arg; i++, arg = va_arg(arg_ptr, const char *))
+        /* nothing*/;
+    va_end(arg_ptr);
+
+    argc = i;
+    argv = calloc(argc + 1, sizeof(*argv)); /* 1 for NULL argument */
+
+    va_start(arg_ptr, arg0);
+    for(i = 0, arg = arg0; arg; i++, arg = va_arg(arg_ptr, const char *))
+        argv[i] = strdup(arg);
+    va_end(arg_ptr);
+
+    rc = rsp_spawnv(rsp_spawnf, mode, name, argv);
+
+    for(i = 0; i < argc; i++)
+        free(argv[i]);
+    free(argv);
+
+    return rc;
+}
+
+#define spawnl(mode, name, arg0, ...) \
+        rsp_spawnl(RSP_SPAWN, mode, name, arg0, __VA_ARGS__)
+
+#define spawnvp(mode, name, argv) rsp_spawnv(RSP_SPAWNP, mode, name, argv)
+
+#define execl(name, arg0, ...) \
+        rsp_spawnl(RSP_EXEC, 0, name, arg0, __VA_ARGS__)
+
+#define execvp(name, argv) rsp_spawnv(RSP_EXECP, 0, name, argv)
+
 static Signal_t
 spawn_sighandler(int sig)
 {
@@ -939,6 +1115,7 @@ result(pTHX_ int flag, int pid)
 	do {
 	    r = wait4pid(pid, &status, 0);
 	} while (r == -1 && errno == EINTR);
+	remove_rsp_temp(pid);
 	rsignal(SIGINT, ihand);
 	rsignal(SIGQUIT, qhand);
 
@@ -949,6 +1126,7 @@ result(pTHX_ int flag, int pid)
 #else
 	ihand = rsignal(SIGINT, SIG_IGN);
 	r = DosWaitChild(DCWA_PROCESS, DCWW_WAIT, &res, &rpid, pid);
+	remove_rsp_temp(pid);
 	rsignal(SIGINT, ihand);
 	PL_statusvalue = res.codeResult << 8 | res.codeTerminate;
 	if (r)
@@ -4919,6 +5097,10 @@ extern void _CRT_term(void);
 void
 Perl_OS2_term(void **p, int exitstatus, int flags)
 {
+    /* Remove remaining temporary response file */
+    remove_rsp_temp(-1);
+
+#ifndef __KLIBC__
     if (!emx_runtime_secondary)
 	return;
 
@@ -4949,6 +5131,7 @@ Perl_OS2_term(void **p, int exitstatus, int flags)
     if (flags & FORCE_EMX_DEINIT_CRT_TERM)
 	_CRT_term();			/* Flush buffers, etc. */
     /* Now it is a good time to call exit() in the caller's CRTL... */
+#endif
 }
 
 #include <emx/startup.h>
