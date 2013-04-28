@@ -8,6 +8,8 @@ use vars qw($Is_VMS $Is_W32 $Is_OS2 $Is_Cygwin $Is_Darwin $Is_NetWare
 	    %opts $packlist);
 use subs qw(unlink link chmod);
 
+use File::Copy;
+
 use Config;
 BEGIN {
     if ($Config{userelocatableinc}) {
