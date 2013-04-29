@@ -351,6 +351,11 @@ static char sccsid[] = "@(#)strptime.c	0.1 (Powerdog) 94/03/27";
 #include <time.h>
 #include <ctype.h>
 #include <string.h>
+
+#ifdef __KLIBC__
+#define _strptime perl_strptime
+#endif
+
 static char * _strptime(pTHX_ const char *, const char *, struct tm *,
 			int *got_GMT);
 
