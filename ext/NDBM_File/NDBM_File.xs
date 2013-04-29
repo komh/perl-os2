@@ -1,5 +1,9 @@
 #define PERL_NO_GET_CONTEXT
 
+#ifdef __KLIBC__
+#  define I_NDBM    /* kLIBC has ndbm.h */
+#endif
+
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
