@@ -170,7 +170,7 @@ PERLCALLcv(PCSZ name, SV *cv, ULONG argc, PRXSTRING argv, PCSZ queue, PRXSTRING 
 
 #ifndef __KLIBC__
     DosSetExceptionHandler(&xreg);
-endif
+#endif
 
     ENTER;
     SAVETMPS;
