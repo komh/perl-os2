@@ -1549,6 +1549,18 @@ do_spawn_ve(pTHX_ SV *really, U32 flag, U32 execf, char *inicmd, U32 addflag)
 	fcntl(2, F_SETFD, fl_stderr);
     } else if (nostderr)
        close(2);
+
+    if (execf == EXECF_SPAWN_NOWAIT || trueflag == P_NOWAIT)
+	PL_statusvalue = -1;    /* >16bits hint for pp_system() */
+    else {
+	if (rc < 0)
+	    rc = 0xFF << 8;
+	else
+	    rc <<= 8;
+
+	PL_statusvalue = rc;
+    }
+
     return rc;
 }
 
@@ -1649,6 +1661,18 @@ do_spawn3(pTHX_ char *cmd, int execf, int flag)
 		if (rc < 0)
 		    rc = -1;
 	    }
+
+	    if (execf == EXECF_SPAWN_NOWAIT || flag == P_NOWAIT)
+		PL_statusvalue = -1;    /* >16bits hint for pp_system() */
+	    else {
+		if (rc < 0)
+		    rc = 0xFF << 8;
+		else
+		    rc <<= 8;
+
+		PL_statusvalue = rc;
+	    }
+
 	    if (news)
 		Safefree(news);
 	    return rc;
@@ -1673,7 +1697,8 @@ do_spawn3(pTHX_ char *cmd, int execf, int flag)
     if (PL_Argv[0])
 	rc = do_spawn_ve(aTHX_ NULL, flag, execf, cmd, mergestderr);
     else
-    	rc = -1;
+	PL_statusvalue = rc = (execf == EXECF_SPAWN_NOWAIT || flag == P_NOWAIT)
+			      ? -1 : (0xFF << 8);
     if (news)
 	Safefree(news);
     do_execfree();
@@ -1722,7 +1747,7 @@ os2_aspawn_4(pTHX_ SV *really, register SV **args, I32 cnt, int execing)
 	    rc = do_spawn_ve(aTHX_ really, flag, execf[execing], NULL, 0);
 	}
     } else
-    	rc = -1;
+	PL_statusvalue = rc = (execing == ASPAWN_NOWAIT) ? -1 : (0xFF << 8);
     do_execfree();
     return rc;
 }
