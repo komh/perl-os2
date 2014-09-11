@@ -472,6 +472,9 @@ char *ctermid(char *s);
 
 #define OP_BINARY O_BINARY
 
+#define setmode(handle, mode) \
+    (setmode((handle), isatty((handle)) ? O_TEXT : (mode)))
+
 #define OS2_STAT_HACK 1
 #if OS2_STAT_HACK
 
