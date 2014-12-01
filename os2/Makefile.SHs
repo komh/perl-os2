@@ -117,20 +117,20 @@ depend: os2/os2ish.h os2/os2thread.h
 # Deal with os2/* stuff
 os2$(OBJ_EXT): os2.c os2ish.h os2thread.h
 os2.c:
-	ln -s os2/$@ $@
+	cp -f os2/$@ $@
 dl_os2.c: os2/dl_os2.c
-	ln -s os2/$@ $@
+	cp -f os2/$@ $@
 perlrexx$(OBJ_EXT): perlrexx.c os2ish.h os2thread.h
 perlrexx.c:
-	ln -s os2/$@ $@
+	cp -f os2/$@ $@
 
 os2ish.h: os2/os2ish.h
-	ln -s $< $@
+	cp -f $< $@
 
 os2thread.h: os2/os2thread.h
-	ln -s os2/$@ $@
+	cp -f os2/$@ $@
 
-installcmd : 
+installcmd :
 	@perl -e 'die qq{Give the option INSTALLCMDDIR=... to make!} if $$ARGV[0] eq ""' $(INSTALLCMDDIR)
 	./miniperl$(EXE_EXT) -Ilib os2/perl2cmd.pl $(INSTALLCMDDIR)
 
