@@ -2041,7 +2041,10 @@ os2_chmod (const char *name, int pmode)	/* Modelled after EMX src/lib/io/chmod.c
 void *
 sys_alloc(int size) {
     void *got;
-    APIRET rc = DosAllocMem(&got, size, PAG_COMMIT | PAG_WRITE);
+    APIRET rc = DosAllocMem(&got, size, PAG_COMMIT | PAG_WRITE | OBJ_ANY);
+
+    if (rc == ERROR_NOT_ENOUGH_MEMORY)
+	rc = DosAllocMem(&got, size, PAG_COMMIT | PAG_WRITE);
 
     if (rc == ERROR_NOT_ENOUGH_MEMORY) {
 	return (void *) -1;

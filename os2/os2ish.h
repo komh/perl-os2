@@ -306,13 +306,15 @@ void Perl_OS2_term(void **excH, int exitstatus, int flags);
 /* #  define PERL_SBRK_VIA_MALLOC */ /* gets off-page sbrk... */
 #else /* !PERL_IS_AOUT */
 #  ifndef PERL_FOR_X2P
-#    ifdef EMX_BAD_SBRK
+#    if defined(EMX_BAD_SBRK) || defined(__KLIBC__)
 #      define USE_PERL_SBRK
-#    endif 
+#      define PERL_SBRK_VIA_MALLOC
+#    endif
 #  else
 #    define PerlIO FILE
 #  endif 
 #  define SYSTEM_ALLOC(a) sys_alloc(a)
+#  define SYSTEM_ALLOC_ALIGNMENT 4096
 
 void *sys_alloc(int size);
 
