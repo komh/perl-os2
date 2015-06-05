@@ -7,7 +7,7 @@
  *	available to set I/O characteristics
  */
 #define	HAS_IOCTL		/**/
- 
+
 /* HAS_UTIME:
  *	This symbol, if defined, indicates that the routine utime() is
  *	available to update the access and modification times of files.
@@ -78,7 +78,7 @@ extern char **environ;
 #define USE_STAT_RDEV 	/**/
 
 /* ACME_MESS:
- *	This symbol, if defined, indicates that error messages should be 
+ *	This symbol, if defined, indicates that error messages should be
  *	should be generated in a format that allows the use of the Acme
  *	GUI/editor's autofind feature.
  */
@@ -116,7 +116,7 @@ extern char **environ;
 #if defined(I_SYS_UN) && !defined(TCPIPV4)
 /* It is not working without TCPIPV4 defined. */
 # undef I_SYS_UN
-#endif 
+#endif
 
 #ifdef USE_ITHREADS
 
@@ -312,7 +312,7 @@ void Perl_OS2_term(void **excH, int exitstatus, int flags);
 #    endif
 #  else
 #    define PerlIO FILE
-#  endif 
+#  endif
 #  define SYSTEM_ALLOC(a) sys_alloc(a)
 #  define SYSTEM_ALLOC_ALIGNMENT 4096
 
@@ -321,7 +321,7 @@ void *sys_alloc(int size);
 #endif /* !PERL_IS_AOUT */
 #if !defined(PERL_CORE) && !defined(PerlIO) /* a2p */
 #  define PerlIO FILE
-#endif 
+#endif
 
 /* os2ish is used from a2p/a2p.h without pTHX/pTHX_ first being
  * defined.  Hack around this to get us to compile.
@@ -452,7 +452,7 @@ void *emx_realloc (void *, size_t);
 #endif
 
 #ifdef __GNUG__
-# define HAS_BOOL 
+# define HAS_BOOL
 #endif
 #ifndef HAS_BOOL
 # define bool char
@@ -602,7 +602,7 @@ void init_PMWIN_entries(void);
   ((expr) ? : (CroakWinError(die,name1 name2), 0))
 
 #define FillOSError(rc) (os2_setsyserrno(rc),				\
-			Perl_severity = SEVERITY_ERROR) 
+			Perl_severity = SEVERITY_ERROR)
 
 #define WinError_2_Perl_rc	\
  (	init_PMWIN_entries(),	\
@@ -628,11 +628,11 @@ enum entries_ordinals {
     ORD_DosSetExtLibpath,
     ORD_DosVerifyPidTid,
     ORD_SETHOSTENT,
-    ORD_SETNETENT, 
+    ORD_SETNETENT,
     ORD_SETPROTOENT,
     ORD_SETSERVENT,
     ORD_GETHOSTENT,
-    ORD_GETNETENT, 
+    ORD_GETNETENT,
     ORD_GETPROTOENT,
     ORD_GETSERVENT,
     ORD_ENDHOSTENT,
@@ -716,7 +716,7 @@ enum entries_ordinals {
     ORD_WinSetClipbrdData,
     ORD_WinSetClipbrdOwner,
     ORD_WinSetClipbrdViewer,
-    ORD_WinEnumClipbrdFmts, 
+    ORD_WinEnumClipbrdFmts,
     ORD_WinEmptyClipbrd,
     ORD_WinAddAtom,
     ORD_WinFindAtom,
@@ -802,7 +802,7 @@ enum entries_ordinals {
 void ResetWinError(void);
 void CroakWinError(int die, char *name);
 
-enum Perlos2_handler { 
+enum Perlos2_handler {
   Perlos2_handler_mangle = 1,
   Perlos2_handler_perl_sh,
   Perlos2_handler_perllib_from,
