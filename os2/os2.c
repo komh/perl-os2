@@ -953,24 +953,38 @@ rsp_spawnv(U32 rsp_spawnf, int mode, const char *name, char * const argv[])
     char *rsp_argv[3];
     char  rsp_name_arg[] = "@perl-rsp-XXXXXX";
     char *rsp_name = &rsp_name_arg[1];
-    int   arg_len = 0;
     int   i;
+    int   saved_errno;
 
-    for (i = 0; argv[i]; i++)
-        arg_len += strlen(argv[i]) + 1;
+    switch (rsp_spawnf) {
+    case RSP_SPAWNP :
+        rc = spawnvp(mode, name, argv);
+        break;
 
-    /* if a length of command line is longer than MAX_CMD_LINE_LEN, then use
-     * a response file. OS/2 cannot process a command line longer than 32K.
-     * Of course, a response file cannot be recognized by a normal OS/2
-     * program, that is, neither non-EMX or non-kLIBC. But it cannot accept
-     * a command line longer than 32K in itself. So using a response file
-     * in this case, is an acceptable solution */
-    if (arg_len > MAX_CMD_LINE_LEN) {
+    case RSP_EXEC :
+        rc = execv(name, argv);
+        break;
+
+    case RSP_EXECP :
+        rc = execvp(name, argv);
+
+    default :
+        rc = spawnv(mode, name, argv);
+    }
+
+    saved_errno = errno;
+
+    /* arguments too long? */
+    if (rc == -1 && errno == EINVAL) {
+        /* use a response file */
         int    fd;
         struct temp *t;
 
-        if ((fd = mkstemp(rsp_name)) == -1)
+        if ((fd = mkstemp(rsp_name)) == -1) {
+            errno = saved_errno;
+
             return -1;
+        }
 
         /* write all the arguments except a 0th program name */
         for (i = 1; argv[i]; i++) {
@@ -996,27 +1010,24 @@ rsp_spawnv(U32 rsp_spawnf, int mode, const char *name, char * const argv[])
         rsp_argv[1] = rsp_name_arg;
         rsp_argv[2] = NULL;
 
-        argv = rsp_argv;
-    }
+        switch (rsp_spawnf) {
+        case RSP_SPAWNP :
+            rc = spawnvp(mode, name, rsp_argv);
+            break;
 
-    switch (rsp_spawnf) {
-    case RSP_SPAWNP :
-        rc = spawnvp(mode, name, argv);
-        break;
+        case RSP_EXEC :
+            rc = execv(name, rsp_argv);
+            break;
 
-    case RSP_EXEC :
-        rc = execv(name, argv);
-        break;
+        case RSP_EXECP :
+            rc = execvp(name, rsp_argv);
 
-    case RSP_EXECP :
-        rc = execvp(name, argv);
+        default :
+            rc = spawnv(mode, name, rsp_argv);
+        }
 
-    default :
-        rc = spawnv(mode, name, argv);
-    }
+        saved_errno = errno;
 
-    /* a response file was generated ? */
-    if (argv == rsp_argv) {
         /* make a response file list to clean up later if spawned a child
          * successfully except P_WAIT */
         if (rc >= 0 && ( mode & 0xFF ) != P_WAIT) {
@@ -1031,6 +1042,8 @@ rsp_spawnv(U32 rsp_spawnf, int mode, const char *name, char * const argv[])
         else                    /* failed or P_WAIT ? */
             remove(rsp_name);   /* remove immediately */
     }
+
+    errno = saved_errno;
 
     return rc;
 }
