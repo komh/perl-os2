@@ -3932,6 +3932,7 @@ fprintf(stderr,"sys_is_absolute3 = %s\n",dir);
 		    }
 		}
 	      done:
+		/* nothing */;
 	    }
 	}
 	if (!RETVAL)

@@ -525,7 +525,7 @@ typedef struct OS2_Perl_data {
 
 extern OS2_Perl_data_t OS2_Perl_data;
 
-#define Perl_hab		((HAB)OS2_Perl_data.phab)
+#define Perl_hab		/*(HAB)*/OS2_Perl_data.phab
 #define Perl_rc			(OS2_Perl_data.rc)
 #define Perl_severity		(OS2_Perl_data.severity)
 #define errno_isOS2		12345678
@@ -540,7 +540,7 @@ extern OS2_Perl_data_t OS2_Perl_data;
 			  set_Perl_HAB_f, Perl_hab)
 #define perl_hab_GET()	(Perl_HAB_set ? Perl_hab : _obtain_Perl_HAB)
 #define Acquire_hab()	perl_hab_GET()
-#define Perl_hmq	((HMQ)OS2_Perl_data.phmq)
+#define Perl_hmq	/*(HMQ)*/OS2_Perl_data.phmq
 #define Perl_hmq_refcnt	(OS2_Perl_data.phmq_refcnt)
 #define Perl_hmq_servers	(OS2_Perl_data.phmq_servers)
 #define Perl_os2_initial_mode	(OS2_Perl_data.initial_mode)
