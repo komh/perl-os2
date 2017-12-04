@@ -5391,6 +5391,14 @@ Perl_OS2_init3(char **env, void **preg, int flags)
 	exit(2);
     }
 
+#ifdef __KLIBC__
+  /* Workaround the bug of kLIBC v0.6.6 which is to fail to execute the
+     program when a directory with the same name in the current directory
+     exists. */
+    if (!getenv("EMXPATH"))
+	putenv("EMXPATH=");
+#endif
+
     _emxload_env("PERL_EMXLOAD_SECS");
     /* Some DLLs reset FP flags on load.  We may have been linked with them */
     _control87(MCW_EM, MCW_EM);
